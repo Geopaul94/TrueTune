@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Material 3 dynamic-color parent. Actual colors are driven by the Compose
+      theme (presentation/theme). This XML theme just makes the system window
+      look right before Compose paints.
+    -->
+    <style name="Theme.TrueTune" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>
