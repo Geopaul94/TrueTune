@@ -18,7 +18,7 @@ android {
         minSdk = 26          // Oreo: needed for the best AAudio low-latency path.
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0-phase0"
+        versionName = "0.2.0-phase1"
 
         vectorDrawables { useSupportLibrary = true }
 
@@ -92,6 +92,12 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.compiler)
 
+    // Preferences (A4 reference pitch, etc.)
+    implementation(libs.androidx.datastore.preferences)
+
     // Low-latency audio I/O (Oboe input + output).
     implementation(libs.oboe)
+
+    // Unit tests.
+    testImplementation(libs.junit)
 }

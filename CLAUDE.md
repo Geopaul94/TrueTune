@@ -58,11 +58,19 @@ cd ~/TrueTune
 ## Architecture (layering — domain has no Android imports)
 - `presentation/` — Compose + ViewModels
   - `theme/` — Material 3 palette (cool sky/steel, signal cyan accent)
-  - `diagnostics/` — Phase 0 text-only mic → detector readout
-- `domain/audio/` — `PitchStream` interface, `PitchReading` model,
-  `NoteNaming` (minimal freq → note helper; real music module lands in Phase 1)
-- `data/audio/` — `NativePitchStream` (polls the bridge at ~30 Hz into a
-  `StateFlow`) + `PitchStreamBridge` (JNI `external fun`s, `System.loadLibrary`)
+  - `tuner/` — Phase 1 tuner screen: gauge/needle, note display, A4 sheet
+    - `TunerScreen.kt` — main screen (mic permission, start/stop, A4 button)
+    - `TunerViewModel.kt` — EMA smoothing, maps PitchReading → TunerState
+    - `components/TunerGauge.kt` — 240° Canvas arc with spring-animated needle
+    - `components/NoteDisplay.kt` — big note name + octave + Hz + cents readout
+    - `components/A4Sheet.kt` — bottom sheet slider for A4 reference (415–466 Hz)
+  - `diagnostics/` — Phase 0 text-only readout (kept for debugging, not wired)
+- `domain/music/` — `NoteMapper` (freq → note + cents, configurable A4, 14 unit tests)
+- `domain/model/` — `TunerState`, `AccuracyBand` (IN_TUNE ±3¢, NEAR ±10¢, OFF, NONE)
+- `domain/audio/` — `PitchStream` interface, `PitchReading` model, `NoteNaming` (Phase 0 legacy)
+- `data/audio/` — `NativePitchStream` (polls bridge at ~30 Hz into StateFlow)
+  + `PitchStreamBridge` (JNI `external fun`s, `System.loadLibrary`)
+- `data/prefs/` — `TunerPreferences` (DataStore for A4 reference pitch)
 - `di/` — Hilt bindings for `PitchStream`
 - `cpp/` — the real-time detector
   - `AudioInput.*` — owns the Oboe input stream + the worker; the callback
@@ -86,42 +94,43 @@ safety violation first.
 - Clarity gate: **NSDF peak ≥ 0.5** to publish; **0.9 · max** ratio for peak selection.
 - Frequency band: **27.5 Hz (A0) → 4200 Hz** — covers bass to piccolo fundamentals.
 
-## Resume here (current status — 2026-07-01)
+## Resume here (current status — 2026-07-02)
 
-**Phase 0 — Add Oboe input + prove MPM pitch detection — CODE COMPLETE.**
-APK builds and packages `libtruetune_audio.so` + `liboboe.so` + `libc++_shared.so`
-for arm64-v8a & x86_64 (13MB debug APK). Kotlin/Compose text-only diagnostics
-screen: Start/Stop mic + live readout of frequency, note-guess, cents,
-clarity, dBFS, sample rate, burst, buffer, xruns, API, low-latency path.
-Runtime RECORD_AUDIO permission handled.
+**Phase 0 — CODE COMPLETE.** Oboe input + MPM pitch detector + diagnostics screen.
+On-device verification still pending (no device connected during dev).
 
-### Pending before Phase 1 starts
-1. **On-device verification** — no device was connected during code-complete.
-   Run `./gradlew :app:installDebug` on real hardware — ideally the target
-   cheap phone (Redmi / Realme). Then confirm:
-   - Whistle A4 → reads ~440 Hz ± a few cents, stable (not wobbling).
-   - Guitar low E (~82 Hz) → reads correctly, no octave errors.
-   - **Bass low B (~31 Hz)** → the make-or-break test (competitors fail here).
-   - Silence → no false pitch (silence gate < -50 dBFS holds).
-   - `lowLatencyPath = true` in diagnostics on Pixels; acceptable fallback on cheap phones.
-2. GP review → sign off Phase 0 before starting Phase 1.
+**Phase 1 — Tuner UI — CODE COMPLETE.**
+- `NoteMapper` in `domain/music/` — freq → nearest note + cents, configurable A4,
+  14 unit tests (all passing). Covers A0–C8, handles custom A4 (415–466 Hz).
+- Tuner gauge: 240° Canvas arc with 21 tick marks, spring-animated needle,
+  green glow in the ±3¢ in-tune zone, smooth color transitions per accuracy band.
+- Note display: large note name + octave, Hz readout, cents deviation.
+- EMA smoothing (α=0.3) in TunerViewModel — settles in ~5 readings (~170ms).
+  Snaps on note change to avoid sweeping across the gauge.
+- Silence handling: after 10 silent frames (~330ms) the needle resets to center.
+- A4 reference pitch: adjustable via bottom sheet slider (415–466 Hz), persisted
+  in DataStore. Shown as a tappable chip in the top-right corner.
+- Haptic pulse on entering in-tune band.
+- In-tune accuracy = ±3¢, near = ±10¢ (tighter than most competitors).
+- Diagnostics screen kept for debugging but not wired in main activity.
+
+### Pending before Phase 2 starts
+1. **On-device verification** — install on real hardware and confirm:
+   - Gauge needle is smooth and responsive when playing notes
+   - In-tune state triggers reliably at ±3¢
+   - Silence → needle fades to center, no garbage
+   - A4 adjustment shifts targets correctly
+   - Low bass notes lock cleanly
+2. GP review → sign off before Phase 2.
 
 ## Phase roadmap
-- **Phase 1 (NEXT) — Tuner UI.** Replace the text diagnostics with the real tuner face:
-  - Analog gauge / needle (Compose Canvas), note label + cents deviation, in-tune band (±5¢).
-  - Smoothing (rolling median of last N readings) to kill needle jitter without adding lag.
-  - Configurable A4 reference (432 / 440 / 442 Hz).
-  - Clean transition when clarity drops (fade needle to grey, don't freeze on old value).
-  - Acceptance: guitar tune-up feel matches or beats GuitarTuna on a cheap phone.
-- Phase 2 — Instruments + all tunings + custom tunings (the anti-GuitarTuna wedge:
-  chromatic + guitar 6/7/12 + bass 4/5 + ukulele + violin/viola/cello + mandolin +
-  banjo + all common alt tunings, ALL free).
-- Phase 3 — Metronome (scheduler in native for jitter-free timing; UI, subdivisions,
-  accents, tempo tap, setlists).
-- Phase 4 — Drone (sustain a reference pitch) + pitch-history graph + practice tracker
-  (session logs, streaks).
-- Phase 5 — Onboarding + AdMob + Pro (drone/history/stats/no-ads) + OEM/mic device
-  matrix + compileSdk/target 36 bump + release prep.
+- Phase 2 (NEXT) — Instruments + all tunings + custom tunings (the anti-GuitarTuna
+  wedge: chromatic + guitar 6/7/12 + bass 4/5 + ukulele + violin/viola/cello +
+  mandolin + banjo + all common alt tunings, ALL free). Auto mode + manual/string mode.
+- Phase 3 — Metronome (scheduler in native; UI, subdivisions, accents, tempo tap,
+  setlists).
+- Phase 4 — Drone + pitch-history graph + practice tracker (session logs, streaks).
+- Phase 5 — Onboarding + AdMob + Pro + OEM/mic matrix + compileSdk/target 36 + release.
 
 ## Known gotchas (save future-me the debugging)
 - **JDK 17 is mandatory** for Gradle here (see Build & run). Homebrew `java`
