@@ -86,22 +86,42 @@ safety violation first.
 - Clarity gate: **NSDF peak ≥ 0.5** to publish; **0.9 · max** ratio for peak selection.
 - Frequency band: **27.5 Hz (A0) → 4200 Hz** — covers bass to piccolo fundamentals.
 
-## Sprints / Phase status
-- **Phase 0 — Add Oboe input + prove MPM pitch detection — CODE COMPLETE.**
-  APK builds and packages `libtruetune_audio.so` + `liboboe.so` + `libc++_shared.so`
-  for arm64-v8a & x86_64 (13MB debug APK). Kotlin/Compose text-only diagnostics
-  screen: Start/Stop mic + live readout of frequency, note-guess, cents,
-  clarity, dBFS, sample rate, burst, buffer, xruns, API, low-latency path.
-  Runtime RECORD_AUDIO permission handled.
-  **Outstanding: on-device verification** — no device was connected during
-  code-complete, so needle-stability / low-bass accuracy / silence handling
-  are pending GP running `installDebug` on real hardware, ideally the target
-  cheap-phone (Redmi/Realme). Awaiting GP review before Phase 1.
-- Phase 1 — Tuner UI (gauge, note+cents, in-tune band, smoothing, A4 config) — NEXT
-- Phase 2 — Instruments + all tunings + custom tunings (the anti-GuitarTuna wedge)
-- Phase 3 — Metronome (scheduler in native; UI, subdivisions, accents, setlists)
-- Phase 4 — Drone + pitch-history + practice tracker
-- Phase 5 — Onboarding + AdMob + Pro + OEM/mic matrix + compileSdk/target 36 + release
+## Resume here (current status — 2026-07-01)
+
+**Phase 0 — Add Oboe input + prove MPM pitch detection — CODE COMPLETE.**
+APK builds and packages `libtruetune_audio.so` + `liboboe.so` + `libc++_shared.so`
+for arm64-v8a & x86_64 (13MB debug APK). Kotlin/Compose text-only diagnostics
+screen: Start/Stop mic + live readout of frequency, note-guess, cents,
+clarity, dBFS, sample rate, burst, buffer, xruns, API, low-latency path.
+Runtime RECORD_AUDIO permission handled.
+
+### Pending before Phase 1 starts
+1. **On-device verification** — no device was connected during code-complete.
+   Run `./gradlew :app:installDebug` on real hardware — ideally the target
+   cheap phone (Redmi / Realme). Then confirm:
+   - Whistle A4 → reads ~440 Hz ± a few cents, stable (not wobbling).
+   - Guitar low E (~82 Hz) → reads correctly, no octave errors.
+   - **Bass low B (~31 Hz)** → the make-or-break test (competitors fail here).
+   - Silence → no false pitch (silence gate < -50 dBFS holds).
+   - `lowLatencyPath = true` in diagnostics on Pixels; acceptable fallback on cheap phones.
+2. GP review → sign off Phase 0 before starting Phase 1.
+
+## Phase roadmap
+- **Phase 1 (NEXT) — Tuner UI.** Replace the text diagnostics with the real tuner face:
+  - Analog gauge / needle (Compose Canvas), note label + cents deviation, in-tune band (±5¢).
+  - Smoothing (rolling median of last N readings) to kill needle jitter without adding lag.
+  - Configurable A4 reference (432 / 440 / 442 Hz).
+  - Clean transition when clarity drops (fade needle to grey, don't freeze on old value).
+  - Acceptance: guitar tune-up feel matches or beats GuitarTuna on a cheap phone.
+- Phase 2 — Instruments + all tunings + custom tunings (the anti-GuitarTuna wedge:
+  chromatic + guitar 6/7/12 + bass 4/5 + ukulele + violin/viola/cello + mandolin +
+  banjo + all common alt tunings, ALL free).
+- Phase 3 — Metronome (scheduler in native for jitter-free timing; UI, subdivisions,
+  accents, tempo tap, setlists).
+- Phase 4 — Drone (sustain a reference pitch) + pitch-history graph + practice tracker
+  (session logs, streaks).
+- Phase 5 — Onboarding + AdMob + Pro (drone/history/stats/no-ads) + OEM/mic device
+  matrix + compileSdk/target 36 bump + release prep.
 
 ## Known gotchas (save future-me the debugging)
 - **JDK 17 is mandatory** for Gradle here (see Build & run). Homebrew `java`
